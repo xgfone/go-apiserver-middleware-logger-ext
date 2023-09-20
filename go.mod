@@ -1,4 +1,4 @@
-module github.com/xgfone/go-apiserver-middleware-logger
+module github.com/xgfone/go-apiserver-middleware-logger-ext
 
 require (
 	github.com/xgfone/gconf/v6 v6.4.0

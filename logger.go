@@ -12,14 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package logger provides an extension of
+// Package loggerext provides an extension of
 // "github.com/xgfone/go-apiserver/http/middleware/logger"
 // to support to log the request and response header and body.
 //
 // # Usage
 //
-//	import _ "github.com/xgfone/go-apiserver-middleware-logger"
-package logger
+//	import _ "github.com/xgfone/go-apiserver-middleware-logger-ext"
+package loggerext
 
 import (
 	"bytes"
