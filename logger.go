@@ -65,8 +65,8 @@ func init() {
 	logger.Enabled = enabled
 
 	middlewares := make(middleware.Middlewares, 0, len(middleware.DefaultMiddlewares)+2)
-	middlewares = append(middlewares, middleware.MiddlewareFunc(wrapRequestBody))
-	middlewares = append(middlewares, middleware.MiddlewareFunc(wrapResponseBody))
+	middlewares = append(middlewares, middleware.MiddlewareFunc(WrapRequestBody))
+	middlewares = append(middlewares, middleware.MiddlewareFunc(WrapResponseBody))
 	middlewares = append(middlewares, middleware.DefaultMiddlewares)
 	middleware.DefaultMiddlewares = middlewares
 	router.DefaultRouter.Middlewares.Reset(middlewares...)
@@ -123,7 +123,7 @@ func getbodyattr(data []byte, key, ct string) slog.Attr {
 
 /// ----------------------------------------------------------------------- ///
 
-func wrapRequestBody(next http.Handler) http.Handler {
+func WrapRequestBody(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if logReqBody.Get() {
 			reqbody := reqbody{ct: header.ContentType(r.Header)}
@@ -158,7 +158,7 @@ type reqbody struct {
 
 /// ----------------------------------------------------------------------- ///
 
-func wrapResponseBody(next http.Handler) http.Handler {
+func WrapResponseBody(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !logRespBody.Get() {
 			next.ServeHTTP(w, r)
