@@ -2,8 +2,8 @@ github.com/fsnotify/fsnotify v1.6.0 h1:n+5WquG0fcWoWp6xPWfHdbskMCQaFnG6PfBrh1Ky4
 github.com/fsnotify/fsnotify v1.6.0/go.mod h1:sl3t1tCWJFWoRz9R8WJCbQihKKwmorjAbSClcnxKAGw=
 github.com/xgfone/gconf/v6 v6.4.0 h1:uP92a1wcqVVt9KUjKW2wu+I5MY1FZBHi2NLHQM7WAhQ=
 github.com/xgfone/gconf/v6 v6.4.0/go.mod h1:XNWm7TRMA5rlKh8S00rSPo/zWzbVedXbU1sNonCX8bs=
-github.com/xgfone/go-apiserver v0.0.0-20230920130437-b412715e73a4 h1:EkYyJ8DkjpeUR2eZyoHgtUyriURSmAUfH/bQ8MFjajQ=
-github.com/xgfone/go-apiserver v0.0.0-20230920130437-b412715e73a4/go.mod h1:Gy8Ca32ffXvFqQUX4AYdo2JoymHkpVUBx6Lk803Xa9M=
+github.com/xgfone/go-apiserver v0.42.0 h1:5ZmCU7hQVEc8kJzdJ0AH3HlIlM0l9TRTV7ppcdi0lJI=
+github.com/xgfone/go-apiserver v0.42.0/go.mod h1:Gy8Ca32ffXvFqQUX4AYdo2JoymHkpVUBx6Lk803Xa9M=
 github.com/xgfone/go-atomicvalue v0.2.0 h1:C/28ARO2Nsx1UymHfpxQRxwNwseSDlsgQgsM1VahV6U=
 github.com/xgfone/go-atomicvalue v0.2.0/go.mod h1:fAKLVfK1snK0JKAFRsKhIhd220Cg9SSEuvOay6MXs88=
 github.com/xgfone/go-binder v0.5.0 h1:oQPgssGoOuX21Kr3fEA9kE7ThQhwAmz1oCBSh1T424k=

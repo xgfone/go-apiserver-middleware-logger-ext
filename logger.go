@@ -65,8 +65,8 @@ func init() {
 	logger.Enabled = enabled
 
 	middlewares := make(middleware.Middlewares, 0, len(middleware.DefaultMiddlewares)+2)
-	middlewares = append(middlewares, middleware.MiddlewareFunc(WrapRequestBody))
-	middlewares = append(middlewares, middleware.MiddlewareFunc(WrapResponseBody))
+	middlewares = append(middlewares, middleware.New("", 1, WrapRequestBody))
+	middlewares = append(middlewares, middleware.New("", 2, WrapResponseBody))
 	middlewares = append(middlewares, middleware.DefaultMiddlewares)
 	middleware.DefaultMiddlewares = middlewares
 	router.DefaultRouter.Middlewares.Reset(middlewares...)

@@ -2,7 +2,7 @@ module github.com/xgfone/go-apiserver-middleware-logger-ext
 
 require (
 	github.com/xgfone/gconf/v6 v6.4.0
-	github.com/xgfone/go-apiserver v0.0.0-20230920130437-b412715e73a4
+	github.com/xgfone/go-apiserver v0.42.0
 	github.com/xgfone/go-rawjson v0.1.0
 )
 
