@@ -18,7 +18,12 @@
 //
 // # Usage
 //
-//	import _ "github.com/xgfone/go-apiserver-middleware-logger-ext"
+//	import (
+//		loggerext "github.com/xgfone/go-apiserver-middleware-logger-ext"
+//		"github.com/xgfone/go-apiserver/http/router"
+//	)
+//
+//	router.DefaultRouter.Middlewares.InsertFunc(loggerext.WrapHandler)
 package loggerext
 
 import (
@@ -30,13 +35,9 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"unsafe"
 
 	"github.com/xgfone/gconf/v6"
-	"github.com/xgfone/go-apiserver/helper"
-	"github.com/xgfone/go-apiserver/http/header"
-	"github.com/xgfone/go-apiserver/http/middleware"
-	"github.com/xgfone/go-apiserver/http/middleware/logger"
-	"github.com/xgfone/go-apiserver/http/router"
 	"github.com/xgfone/go-rawjson"
 )
 
@@ -51,7 +52,7 @@ var (
 	logBodyMaxLen = group.NewInt("bodymaxlen", 2048,
 		"The maximum length of the request or response body to log.")
 	logBodyTypes = group.NewStringSlice("bodytypes", []string{
-		header.MIMEApplicationJSON, header.MIMEApplicationForm,
+		"application/json", "application/x-www-form-urlencoded",
 	}, "The content types of the request or response body to log.")
 )
 
@@ -60,20 +61,22 @@ var bufpool = sync.Pool{New: func() interface{} { return bytes.NewBuffer(make([]
 func getbuffer() *bytes.Buffer  { return bufpool.Get().(*bytes.Buffer) }
 func putbuffer(b *bytes.Buffer) { b.Reset(); bufpool.Put(b) }
 
-func init() {
-	logger.Collect = collect
-	logger.Enabled = enabled
-
-	middlewares := make(middleware.Middlewares, 0, len(middleware.DefaultMiddlewares)+2)
-	middlewares = append(middlewares, middleware.New("", 1, WrapRequestBody))
-	middlewares = append(middlewares, middleware.New("", 2, WrapResponseBody))
-	middlewares = append(middlewares, middleware.DefaultMiddlewares)
-	middleware.DefaultMiddlewares = middlewares
-	router.DefaultRouter.Middlewares.Reset(middlewares...)
+// WrapHandler wraps a http handler and returns a new,
+// which will replace the request and response writer,
+// so must be used before the logger middleware.
+func WrapHandler(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w, r = WrapReqRespBody(w, r)
+		defer Release(w, r)
+		next.ServeHTTP(w, r)
+	})
 }
 
-func enabled(req *http.Request) bool { return req.URL.Path != "/" }
-func collect(w http.ResponseWriter, r *http.Request, appendAttr func(...slog.Attr)) {
+// Enabled reports whether to log the request.
+func Enabled(req *http.Request) bool { return req.URL.Path != "/" }
+
+// Collect collects the key-value log information and appends them by appendAttr.
+func Collect(w http.ResponseWriter, r *http.Request, appendAttr func(...slog.Attr)) {
 	if logQuery.Get() {
 		appendAttr(slog.String("query", r.URL.RawQuery))
 	}
@@ -96,7 +99,7 @@ func collect(w http.ResponseWriter, r *http.Request, appendAttr func(...slog.Att
 	if rw := getResponseWriter(w); rw != nil {
 		_len := rw.buf.Len()
 		appendAttr(slog.Int("respbodylen", _len))
-		if ct := header.ContentType(w.Header()); shouldlogbody(ct, _len) {
+		if ct := getContentType(w.Header()); shouldlogbody(ct, _len) {
 			appendAttr(getbodyattr(rw.buf.Bytes(), "respbody", ct))
 		}
 	}
@@ -118,57 +121,88 @@ func getbodyattr(data []byte, key, ct string) slog.Attr {
 	if strings.HasSuffix(ct, "json") {
 		return slog.Any(key, rawjson.Bytes(data))
 	}
-	return slog.String(key, helper.String(data))
+	return slog.String(key, unsafe.String(unsafe.SliceData(data), len(data)))
+}
+
+func getContentType(header http.Header) (mime string) {
+	mime = header.Get("Content-Type")
+	if index := strings.IndexByte(mime, ';'); index > -1 {
+		mime = strings.TrimSpace(mime[:index])
+	}
+	return
 }
 
 /// ----------------------------------------------------------------------- ///
 
-func WrapRequestBody(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if logReqBody.Get() {
-			reqbody := reqbody{ct: header.ContentType(r.Header)}
-			if slices.Contains(logBodyTypes.Get(), reqbody.ct) {
-				buf := getbuffer()
-				defer putbuffer(buf)
-
-				_, err := io.CopyBuffer(buf, r.Body, make([]byte, 512))
-				if err != nil {
-					slog.Error("fail to read the request body", "raddr", r.RemoteAddr,
-						"method", r.Method, "path", r.RequestURI, "err", err)
-				}
-
-				reqbody.data = buf.Bytes()
-				r.Body = io.NopCloser(buf)
-
-				r = r.WithContext(context.WithValue(r.Context(), reqbodykey, reqbody))
-			}
-		}
-
-		next.ServeHTTP(w, r)
-	})
+// WrapReqRespBody wraps the http request and response writer, and returns the new,
+// which is used by the http middleware, such as WrapHandler.
+//
+// NOTICE: Release should be called after handling the request.
+func WrapReqRespBody(w http.ResponseWriter, r *http.Request) (http.ResponseWriter, *http.Request) {
+	w, r = wrapRequestBody(w, r)
+	w, r = wrapResponseBody(w, r)
+	return w, r
 }
 
-var reqbodykey = contextkey{key: "reqbodybuf"}
+// Release tries to release the buffer into the pool.
+func Release(w http.ResponseWriter, r *http.Request) {
+	if reqbody, ok := r.Context().Value(reqbodykey).(reqbody); ok {
+		putbuffer(reqbody.buf)
+	}
+	if rw := getResponseWriter(w); rw != nil {
+		putbuffer(rw.buf)
+	}
+}
+
+/// ----------------------------------------------------------------------- ///
+
+func wrapRequestBody(w http.ResponseWriter, r *http.Request) (http.ResponseWriter, *http.Request) {
+	if !logReqBody.Get() {
+		return w, r
+	}
+
+	reqbody := reqbody{ct: getContentType(r.Header)}
+	if slices.Contains(logBodyTypes.Get(), reqbody.ct) {
+		reqbody.buf = getbuffer()
+		_, err := io.CopyBuffer(reqbody.buf, r.Body, make([]byte, 512))
+		if err != nil {
+			slog.Error("fail to read the request body", "raddr", r.RemoteAddr,
+				"method", r.Method, "path", r.RequestURI, "err", err)
+		}
+
+		reqbody.data = reqbody.buf.Bytes()
+		r.Body = io.NopCloser(reqbody.buf)
+
+		r = r.WithContext(context.WithValue(r.Context(), reqbodykey, reqbody))
+	}
+
+	return w, r
+}
+
+var (
+	reqbodykey  = contextkey{key: "reqbodykey"}
+	respbodykey = contextkey{key: "respbodykey"}
+)
 
 type contextkey struct{ key string }
 type reqbody struct {
 	data []byte
+	buf  *bytes.Buffer
 	ct   string
 }
 
 /// ----------------------------------------------------------------------- ///
 
-func WrapResponseBody(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !logRespBody.Get() {
-			next.ServeHTTP(w, r)
-			return
-		}
+func wrapResponseBody(w http.ResponseWriter, r *http.Request) (http.ResponseWriter, *http.Request) {
+	if !logRespBody.Get() {
+		return w, r
+	}
 
-		buf := getbuffer()
-		next.ServeHTTP(newResponseWriter(w, buf), r)
-		putbuffer(buf)
-	})
+	buf := getbuffer()
+	w = newResponseWriter(w, buf)
+	r = r.WithContext(context.WithValue(r.Context(), respbodykey, w))
+
+	return w, r
 }
 
 func getResponseWriter(w http.ResponseWriter) *responseWriter {
