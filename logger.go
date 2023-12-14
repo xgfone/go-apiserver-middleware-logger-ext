@@ -61,6 +61,25 @@ var bufpool = sync.Pool{New: func() interface{} { return bytes.NewBuffer(make([]
 func getbuffer() *bytes.Buffer  { return bufpool.Get().(*bytes.Buffer) }
 func putbuffer(b *bytes.Buffer) { b.Reset(); bufpool.Put(b) }
 
+type ctxkeytype int8
+
+var logrespkey = ctxkeytype(0)
+
+func logRespFromContext(ctx context.Context) (log, ok bool) {
+	if v := ctx.Value(logrespkey); v != nil {
+		return v.(bool), true
+	}
+	return
+}
+
+// DisableLogRespBody returns a new context to set a flag to indicate
+// not to log the response body.
+//
+// If not set, use the default policy.
+func DisableLogRespBody(ctx context.Context) context.Context {
+	return context.WithValue(ctx, logrespkey, false)
+}
+
 // WrapHandler wraps a http handler and returns a new,
 // which will replace the request and response writer,
 // so must be used before the logger middleware.
@@ -195,6 +214,10 @@ type reqbody struct {
 
 func wrapResponseBody(w http.ResponseWriter, r *http.Request) (http.ResponseWriter, *http.Request) {
 	if !logRespBody.Get() {
+		return w, r
+	}
+
+	if log, ok := logRespFromContext(r.Context()); ok && !log {
 		return w, r
 	}
 
