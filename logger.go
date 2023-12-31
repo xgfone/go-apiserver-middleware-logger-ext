@@ -32,7 +32,6 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
-	"slices"
 	"strings"
 	"sync"
 	"unsafe"
@@ -52,7 +51,7 @@ var (
 	logBodyMaxLen = group.NewInt("bodymaxlen", 2048,
 		"The maximum length of the request or response body to log.")
 	logBodyTypes = group.NewStringSlice("bodytypes", []string{
-		"application/json", "application/x-www-form-urlencoded",
+		"text/*", "application/json", "application/x-www-form-urlencoded",
 	}, "The content types of the request or response body to log.")
 )
 
@@ -128,12 +127,7 @@ func shouldlogbody(ct string, datalen int) bool {
 	if maxlen := logBodyMaxLen.Get(); maxlen > 0 && datalen > maxlen {
 		return false
 	}
-
-	if !slices.Contains(logBodyTypes.Get(), ct) {
-		return false
-	}
-
-	return true
+	return containsct(ct)
 }
 
 func getbodyattr(data []byte, key, ct string) slog.Attr {
@@ -149,6 +143,34 @@ func getContentType(header http.Header) (mime string) {
 		mime = strings.TrimSpace(mime[:index])
 	}
 	return
+}
+
+func containsct(ct string) bool {
+	cts := logBodyTypes.Get()
+	for _, _ct := range cts {
+		if _ct == "" {
+			continue
+		}
+
+		switch _len := len(_ct); {
+		case _len == 0:
+
+		case _ct[_len-1] == '*':
+			if strings.HasPrefix(ct, _ct[:_len-1]) {
+				return true
+			}
+
+		case _ct[0] == '*':
+			if strings.HasSuffix(ct, _ct[1:]) {
+				return true
+			}
+
+		case _ct == ct:
+			return true
+		}
+	}
+
+	return false
 }
 
 /// ----------------------------------------------------------------------- ///
@@ -181,7 +203,7 @@ func wrapRequestBody(w http.ResponseWriter, r *http.Request) (http.ResponseWrite
 	}
 
 	reqbody := reqbody{ct: getContentType(r.Header)}
-	if slices.Contains(logBodyTypes.Get(), reqbody.ct) {
+	if containsct(reqbody.ct) {
 		reqbody.buf = getbuffer()
 		_, err := io.CopyBuffer(reqbody.buf, r.Body, make([]byte, 512))
 		if err != nil {
