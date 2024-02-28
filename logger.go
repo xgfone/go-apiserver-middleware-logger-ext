@@ -131,7 +131,7 @@ func shouldlogbody(ct string, datalen int) bool {
 }
 
 func getbodyattr(data []byte, key, ct string) slog.Attr {
-	if strings.HasSuffix(ct, "json") {
+	if strings.HasSuffix(ct, "json") && len(data) > 0 && (data[0] == '{' || data[0] == '[') {
 		return slog.Any(key, rawjson.Bytes(data))
 	}
 	return slog.String(key, unsafe.String(unsafe.SliceData(data), len(data)))
