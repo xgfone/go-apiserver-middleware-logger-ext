@@ -14,7 +14,11 @@
 
 package loggerext
 
-import "testing"
+import (
+	"net/http"
+	"net/url"
+	"testing"
+)
 
 func TestContainsCT(t *testing.T) {
 	_ = logBodyTypes.Set([]string{"text/*", "application/json", "*/xml"})
@@ -33,5 +37,37 @@ func TestContainsCT(t *testing.T) {
 
 	if containsct("application/x-www-form-urlencoded") {
 		t.Errorf("unexpect to contain '%s'", "application/x-www-form-urlencoded")
+	}
+}
+
+func TestAppendIgnorePath(t *testing.T) {
+	AppendIgnorePath("")
+	AppendIgnorePath("/")
+	AppendIgnorePath("/path1")
+	AppendIgnorePath("/path2/")
+
+	req := &http.Request{URL: &url.URL{Path: "/"}}
+	if Enabled(req) {
+		t.Error("expect false, but got true")
+	}
+
+	req.URL.Path = "/path1"
+	if Enabled(req) {
+		t.Error("expect false, but got true")
+	}
+
+	req.URL.Path = "/path1/path2"
+	if !Enabled(req) {
+		t.Error("expect true, but got fasle")
+	}
+
+	req.URL.Path = "/path2"
+	if !Enabled(req) {
+		t.Error("expect true, but got false")
+	}
+
+	req.URL.Path = "/path2/path1"
+	if Enabled(req) {
+		t.Error("expect false, but got true")
 	}
 }

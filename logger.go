@@ -90,8 +90,45 @@ func WrapHandler(next http.Handler) http.Handler {
 	})
 }
 
+var ignorepaths []func(path string) bool
+
+func isignore(path string) bool {
+	for _, ignore := range ignorepaths {
+		if ignore(path) {
+			return true
+		}
+	}
+	return false
+}
+
+// AppendIgnorePath appends the ignored path, which is not logged.
+//
+// "" and "/" are ignored.
+// If path ends with "/", it is a prefix matching; Or, an equal matching.
+func AppendIgnorePath(path string) {
+	switch path {
+	case "", "/":
+		return
+	}
+
+	if strings.HasSuffix(path, "/") {
+		ignorepaths = append(ignorepaths, func(urlpath string) (ignore bool) {
+			return strings.HasPrefix(urlpath, path)
+		})
+	} else {
+		ignorepaths = append(ignorepaths, func(urlpath string) (ignore bool) {
+			return urlpath == path
+		})
+	}
+}
+
 // Enabled reports whether to log the request.
-func Enabled(req *http.Request) bool { return req.URL.Path != "/" }
+func Enabled(req *http.Request) bool {
+	if req.URL.Path == "/" {
+		return false
+	}
+	return !isignore(req.URL.Path)
+}
 
 // Collect collects the key-value log information and appends them by appendAttr.
 func Collect(w http.ResponseWriter, r *http.Request, appendAttr func(...slog.Attr)) {
