@@ -1,4 +1,4 @@
-// Copyright 2023 xgfone
+// Copyright 2023~2025 xgfone
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -55,7 +55,7 @@ var (
 	}, "The content types of the request or response body to log.")
 )
 
-var bufpool = sync.Pool{New: func() interface{} { return bytes.NewBuffer(make([]byte, 0, 512)) }}
+var bufpool = sync.Pool{New: func() any { return bytes.NewBuffer(make([]byte, 0, 512)) }}
 
 func getbuffer() *bytes.Buffer  { return bufpool.Get().(*bytes.Buffer) }
 func putbuffer(b *bytes.Buffer) { b.Reset(); bufpool.Put(b) }
