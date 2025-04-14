@@ -10,4 +10,4 @@ require (
 	github.com/xgfone/go-toolkit v0.6.0 // indirect
 )
 
-go 1.22
+go 1.22.0

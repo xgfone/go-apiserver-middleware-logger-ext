@@ -101,6 +101,15 @@ func isignore(path string) bool {
 	return false
 }
 
+// AppendIgnorePathFunc appends a function to check
+// whether the url path should be ignored.
+func AppendIgnorePathFunc(f func(urlpath string) bool) {
+	if f == nil {
+		panic("AppendIgnorePathFunc: function is nil")
+	}
+	ignorepaths = append(ignorepaths, f)
+}
+
 // AppendIgnorePath appends the ignored path, which is not logged.
 //
 // "" and "/" are ignored.
@@ -111,15 +120,12 @@ func AppendIgnorePath(path string) {
 		return
 	}
 
-	if strings.HasSuffix(path, "/") {
-		ignorepaths = append(ignorepaths, func(urlpath string) (ignore bool) {
+	AppendIgnorePathFunc(func(urlpath string) bool {
+		if strings.HasSuffix(path, "/") {
 			return strings.HasPrefix(urlpath, path)
-		})
-	} else {
-		ignorepaths = append(ignorepaths, func(urlpath string) (ignore bool) {
-			return urlpath == path
-		})
-	}
+		}
+		return urlpath == path
+	})
 }
 
 // Enabled reports whether to log the request.
